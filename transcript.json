@@ -1,0 +1,41 @@
+{ "messages" : [ { "body" : null,
+        "created_at" : "2012/05/25 04:04:19 +0000",
+        "id" : 577169389,
+        "room_id" : 1,
+        "starred" : false,
+        "type" : "EnterMessage",
+        "user_id" : 1
+      },
+      { "body" : "ok, deploying to production",
+        "created_at" : "2012/05/25 05:01:23 +0000",
+        "id" : 577557437,
+        "room_id" : 1,
+        "starred" : false,
+        "type" : "TextMessage",
+        "user_id" : 2
+      },
+      { "body" : null,
+        "created_at" : "2012/05/25 06:20:29 +0000",
+        "id" : 577214413,
+        "room_id" : 1,
+        "starred" : false,
+        "type" : "KickMessage",
+        "user_id" : 1
+      },
+      { "body" : null,
+        "created_at" : "2012/05/25 07:10:00 +0000",
+        "id" : 577173940,
+        "room_id" : 1,
+        "starred" : false,
+        "type" : "TimestampMessage",
+        "user_id" : null
+      },
+      { "type":"TopicChangeMessage",
+         "room_id": 1,
+         "created_at":"2012/05/25 08:31:47 +0000",
+         "starred":false,
+         "id":579912121,
+         "user_id":1,
+         "body":"prime directive"
+      }
+    ] }
