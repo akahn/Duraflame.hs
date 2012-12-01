@@ -4,7 +4,9 @@ import System.Environment (getArgs)
 import Control.Applicative ((<$>), (<*>), empty)
 import Data.Aeson
 import Data.Text (Text)
+import Network.HTTP.Conduit
 import qualified Data.ByteString.Lazy.Char8 as BL
+import qualified Data.ByteString.Char8 as B
 
 data Message = Message {
   _type :: Text,
@@ -26,14 +28,27 @@ instance FromJSON Message where
     _type   <- v .:  "type"
     return $ Message _type user_id body
 
-loadJSON :: IO (BL.ByteString)
-loadJSON = do
-  args <- getArgs
-  transcript <- BL.readFile (head args)
-  return transcript
+transcriptRequest :: String -> String -> String -> IO (Request m)
+transcriptRequest subdomain room token = do
+  request <- parseUrl $ "https://" ++ subdomain ++ ".campfirenow.com/room/" ++ room ++ "/transcript.json"
+  let request' = applyBasicAuth (B.pack token) "x" request
+  return request'
 
-main :: IO ()
+loadJSON :: IO BL.ByteString
+loadJSON = do
+  request <- transcriptRequest "paperlesspost" "203957" "470ad468ec9a68996be2812d5367c97f2c87e545"
+  response <- withManager $ httpLbs request
+  return $ responseBody response
+
+parseTranscript = do
+  transcriptBody <- loadJSON
+  return $ (decode transcriptBody :: Maybe Transcript)
+
+writeLog :: Transcript -> IO ()
+writeLog transcript = undefined
+
+
 main = do
-  transcript <- loadJSON
-  let req = decode transcript :: Maybe Transcript
-  print req
+  [subdomain, room, token] <- getArgs
+  -- make request object, make http request, parse json
+  parseTranscript >>= print
