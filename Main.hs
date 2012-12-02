@@ -1,17 +1,20 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
 
 import System.Environment (getArgs)
+import System.IO
 import Control.Applicative ((<$>), (<*>), empty)
+import Data.Maybe
+import Control.Failure
 import Data.Aeson
-import Data.Text (Text)
+import Data.DateTime
 import Network.HTTP.Conduit
 import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Data.ByteString.Char8 as B
 
 data Message = Message {
-  _type :: Text,
+  _type :: String,
   user_id :: Maybe Integer,
-  body :: Maybe Text } deriving (Show)
+  body :: Maybe String } deriving (Show)
 
 data Transcript = Transcript {
   messages :: [Message] } deriving (Show)
@@ -28,27 +31,40 @@ instance FromJSON Message where
     _type   <- v .:  "type"
     return $ Message _type user_id body
 
-transcriptRequest :: String -> String -> String -> IO (Request m)
-transcriptRequest subdomain room token = do
+data TranscriptRequest = TranscriptRequest {
+  subdomain :: String,
+  room :: String,
+  token :: String } deriving (Show)
+
+buildTranscriptRequest :: Failure HttpException m => String -> String -> String -> m (Request m1)
+buildTranscriptRequest subdomain room token = do
   request <- parseUrl $ "https://" ++ subdomain ++ ".campfirenow.com/room/" ++ room ++ "/transcript.json"
   let request' = applyBasicAuth (B.pack token) "x" request
   return request'
 
-loadJSON :: IO BL.ByteString
-loadJSON = do
-  request <- transcriptRequest "paperlesspost" "203957" "470ad468ec9a68996be2812d5367c97f2c87e545"
+makeTranscriptRequest request = do
   response <- withManager $ httpLbs request
   return $ responseBody response
 
-parseTranscript = do
-  transcriptBody <- loadJSON
-  return $ (decode transcriptBody :: Maybe Transcript)
+-- makeTranscriptRequest req = BL.readFile "transcript.json"
 
-writeLog :: Transcript -> IO ()
-writeLog transcript = undefined
+parseTranscript :: BL.ByteString -> Maybe Transcript
+parseTranscript transcriptBody = decode transcriptBody
 
+writeLog transcript = do
+  withFile "output.log" WriteMode (\handle -> do
+    hPutStr handle (foldl (\acc m -> acc ++ logLine m) "" (messages transcript)))
+
+logLine :: Message -> String
+logLine (Message "TextMessage" user_id body) = "<" ++ show (fromJust user_id) ++ "> " ++ fromJust body ++ "\n"
+logLine (Message "KickMessage" user_id body) = show (fromJust user_id) ++ " has left #campfire" ++ "\n"
+logLine (Message "EnterMessage" user_id body) = show (fromJust user_id) ++ " has joined #campfire" ++ "\n"
+logLine (Message "TopicChangeMessage" user_id body) = show (fromJust user_id) ++ " changed the topic of #campfire to: " ++ fromJust body ++ "\n"
+logLine _ = ""
 
 main = do
   [subdomain, room, token] <- getArgs
-  -- make request object, make http request, parse json
-  parseTranscript >>= print
+  request <- buildTranscriptRequest subdomain room token
+  json <- makeTranscriptRequest request
+  let transcript = parseTranscript json
+  writeLog $ fromJust transcript
