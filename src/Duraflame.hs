@@ -45,7 +45,7 @@ buildRequest token endpoint = do
   let request' = applyBasicAuth (B.pack token) "x" request
   return request'
 
-makeTranscriptRequest request = do
+runRequest request = do
   response <- withManager $ httpLbs request
   return $ responseBody response
 
@@ -53,10 +53,6 @@ makeTranscriptRequest request = do
 
 parseTranscript :: BL.ByteString -> Maybe Transcript
 parseTranscript transcriptBody = decode transcriptBody
-
-userLookup request = do
-  response <- withManager $ httpLbs request
-  return (decode $ responseBody response)
 
 transcriptEndpoint subdomain room = "https://" ++ subdomain ++ ".campfirenow.com/room/" ++ room ++ "/transcript.json"
 
@@ -76,8 +72,8 @@ logLine _ = ""
 main = do
   [subdomain, room, token] <- getArgs
   request <- buildRequest token (transcriptEndpoint subdomain room)
-  json <- makeTranscriptRequest request
+  json <- runRequest request
   userRequest <- buildRequest token (userEndpoint subdomain "671618")
-  user <- makeTranscriptRequest userRequest
+  user <- runRequest userRequest
   let transcript = parseTranscript json
   writeLog $ fromJust transcript
