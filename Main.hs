@@ -19,6 +19,8 @@ data Message = Message {
 data Transcript = Transcript {
   messages :: [Message] } deriving (Show)
 
+newtype Name = Name String deriving (Show)
+
 instance FromJSON Transcript where
   parseJSON (Object v) = do
     messages <- v .: "messages"
@@ -31,14 +33,15 @@ instance FromJSON Message where
     _type   <- v .:  "type"
     return $ Message _type user_id body
 
-data TranscriptRequest = TranscriptRequest {
-  subdomain :: String,
-  room :: String,
-  token :: String } deriving (Show)
+instance FromJSON Name where
+  parseJSON (Object v) = do
+    user <- v .: "user"
+    name <- user .: "name"
+    return $ Name name
 
-buildTranscriptRequest :: Failure HttpException m => String -> String -> String -> m (Request m1)
-buildTranscriptRequest subdomain room token = do
-  request <- parseUrl $ "https://" ++ subdomain ++ ".campfirenow.com/room/" ++ room ++ "/transcript.json"
+buildRequest :: Failure HttpException m => String -> String -> m (Request m1)
+buildRequest token endpoint = do
+  request <- parseUrl $ endpoint
   let request' = applyBasicAuth (B.pack token) "x" request
   return request'
 
@@ -50,6 +53,14 @@ makeTranscriptRequest request = do
 
 parseTranscript :: BL.ByteString -> Maybe Transcript
 parseTranscript transcriptBody = decode transcriptBody
+
+userLookup request = do
+  response <- withManager $ httpLbs request
+  return (decode $ responseBody response)
+
+transcriptEndpoint subdomain room = "https://" ++ subdomain ++ ".campfirenow.com/room/" ++ room ++ "/transcript.json"
+
+userEndpoint subdomain id = "https://" ++ subdomain ++ ".campfirenow.com/users/" ++ id ++ ".json"
 
 writeLog transcript = do
   withFile "output.log" WriteMode (\handle -> do
@@ -64,7 +75,9 @@ logLine _ = ""
 
 main = do
   [subdomain, room, token] <- getArgs
-  request <- buildTranscriptRequest subdomain room token
+  request <- buildRequest token (transcriptEndpoint subdomain room)
   json <- makeTranscriptRequest request
+  userRequest <- buildRequest token (userEndpoint subdomain "671618")
+  user <- makeTranscriptRequest userRequest
   let transcript = parseTranscript json
   writeLog $ fromJust transcript
